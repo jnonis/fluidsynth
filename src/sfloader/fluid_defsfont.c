@@ -1074,7 +1074,7 @@ fluid_defpreset_import_sfont(fluid_defpreset_t* preset,
 			     fluid_defsfont_t* sfont)
 {
   fluid_list_t *p;
-  SFZone* sfzone;
+  SFPresetZone* sfzone;
   fluid_preset_zone_t* zone;
   int count;
   char zone_name[256];
@@ -1088,7 +1088,7 @@ fluid_defpreset_import_sfont(fluid_defpreset_t* preset,
   p = sfpreset->zone;
   count = 0;
   while (p != NULL) {
-    sfzone = (SFZone *) p->data;
+    sfzone = (SFPresetZone *) p->data;
     FLUID_SNPRINTF(zone_name, sizeof(zone_name), "%s/%d", preset->name, count);
     zone = new_fluid_preset_zone(zone_name);
     if (zone == NULL) {
@@ -1221,7 +1221,7 @@ delete_fluid_preset_zone(fluid_preset_zone_t* zone)
  * fluid_preset_zone_import_sfont
  */
 int
-fluid_preset_zone_import_sfont(fluid_preset_zone_t* zone, SFZone *sfzone, fluid_defsfont_t* sfont)
+fluid_preset_zone_import_sfont(fluid_preset_zone_t* zone, SFPresetZone *sfzone, fluid_defsfont_t* sfont)
 {
   fluid_list_t *r;
   SFGen* sfgen;
@@ -1251,14 +1251,13 @@ fluid_preset_zone_import_sfont(fluid_preset_zone_t* zone, SFZone *sfzone, fluid_
     }
     r = fluid_list_next(r);
   }
-  if ((sfzone->instsamp != NULL) && (sfzone->instsamp->data != NULL)) {
+  if (sfzone->inst != NULL) {
     zone->inst = (fluid_inst_t*) new_fluid_inst();
     if (zone->inst == NULL) {
       FLUID_LOG(FLUID_ERR, "Out of memory");
       return FLUID_FAILED;
     }
-    if (fluid_inst_import_sfont(zone, zone->inst, 
-							(SFInst *) sfzone->instsamp->data, sfont) != FLUID_OK) {
+    if (fluid_inst_import_sfont(zone, zone->inst, sfzone->inst, sfont) != FLUID_OK) {
       return FLUID_FAILED;
     }
   }
@@ -1468,7 +1467,7 @@ fluid_inst_import_sfont(fluid_preset_zone_t* zonePZ, fluid_inst_t* inst,
 						SFInst *sfinst, fluid_defsfont_t* sfont)
 {
   fluid_list_t *p;
-  SFZone* sfzone;
+  SFInstZone* sfzone;
   fluid_inst_zone_t* zone;
   char zone_name[256];
   int count;
@@ -1483,7 +1482,7 @@ fluid_inst_import_sfont(fluid_preset_zone_t* zonePZ, fluid_inst_t* inst,
   count = 0;
   while (p != NULL) {
 
-    sfzone = (SFZone *) p->data;
+    sfzone = (SFInstZone *) p->data;
     FLUID_SNPRINTF(zone_name, sizeof(zone_name), "%s/%d", inst->name, count);
 
     zone = new_fluid_inst_zone(zone_name);
@@ -1619,7 +1618,7 @@ fluid_inst_zone_next(fluid_inst_zone_t* zone)
  */
 int
 fluid_inst_zone_import_sfont(fluid_preset_zone_t* preset_zone, fluid_inst_zone_t* zone,
-							 SFZone *sfzone, fluid_defsfont_t* sfont)
+                             SFInstZone *sfzone, fluid_defsfont_t* sfont)
 {
   fluid_list_t *r;
   SFGen* sfgen;
@@ -1665,8 +1664,8 @@ fluid_inst_zone_import_sfont(fluid_preset_zone_t* preset_zone, fluid_inst_zone_t
 /*    } */
 
   /* fixup sample pointer */
-  if ((sfzone->instsamp != NULL) && (sfzone->instsamp->data != NULL))
-    zone->sample = ((SFSample *)(sfzone->instsamp->data))->fluid_sample;
+  if (sfzone->sample != NULL)
+    zone->sample = sfzone->sample->fluid_sample;
 
   /* Import the modulators (only SF2.1 and higher) */
   for (count = 0, r = sfzone->mod; r != NULL; count++) {

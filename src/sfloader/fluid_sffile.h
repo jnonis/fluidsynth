@@ -39,7 +39,8 @@ typedef union _SFGenAmount SFGenAmount;
 typedef struct _SFVersion SFVersion;
 typedef struct _SFMod SFMod;
 typedef struct _SFGen SFGen;
-typedef struct _SFZone SFZone;
+typedef struct _SFPresetZone SFPresetZone;
+typedef struct _SFInstZone SFInstZone;
 typedef struct _SFSample SFSample;
 typedef struct _SFInst SFInst;
 typedef struct _SFPreset SFPreset;
@@ -82,9 +83,30 @@ struct _SFGen
     SFGenAmount amount; /* generator value */
 };
 
-struct _SFZone
-{ /* Sample/instrument zone structure */
-    fluid_list_t *instsamp; /* instrument/sample pointer for zone */
+struct _SFPresetZone
+{ /* Preset zone structure */
+    unsigned short gen_idx;
+    int gen_count;
+
+    unsigned short mod_idx;
+    int mod_count;
+
+    SFInst *inst;
+
+    fluid_list_t *gen; /* list of generators */
+    fluid_list_t *mod; /* list of modulators */
+};
+
+struct _SFInstZone
+{ /* Instrument zone structure */
+    unsigned short gen_idx;
+    int gen_count;
+
+    unsigned short mod_idx;
+    int mod_count;
+
+    SFSample *sample;
+
     fluid_list_t *gen; /* list of generators */
     fluid_list_t *mod; /* list of modulators */
 };
@@ -114,6 +136,10 @@ struct _SFSample
 struct _SFInst
 { /* Instrument structure */
     char name[21]; /* Name of instrument */
+
+    unsigned int ibag_idx;
+    int ibag_count;
+
     fluid_list_t *zone; /* list of instrument zones */
 };
 
@@ -125,6 +151,10 @@ struct _SFPreset
     unsigned int libr; /* Not used (preserved) */
     unsigned int genre; /* Not used (preserved) */
     unsigned int morph; /* Not used (preserved) */
+
+    unsigned int pbag_idx;
+    int pbag_count;
+
     fluid_list_t *zone; /* list of preset zones */
 };
 
