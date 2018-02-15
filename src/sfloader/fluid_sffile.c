@@ -262,6 +262,11 @@ static int load_ibag(SFData *sf, int size);
 static int load_imod(SFData *sf, int size);
 static int load_igen(SFData *sf, int size);
 static int load_shdr(SFData *sf, unsigned int size);
+
+static int load_inst_zone_gens(SFData *sf, SFInstZone *zone);
+static int load_preset_pgen(SFData *sf, SFPreset *preset, int *count);
+static int load_preset_pmod(SFData *sf, SFPreset *preset, int *count);
+
 static int fixup_preset_zones(SFData *sf);
 static int fixup_inst_zones(SFData *sf);
 static int fixup_sample(SFData *sf);
@@ -941,10 +946,7 @@ static int load_pmod(SFData *sf, int size)
 {
     fluid_list_t *preset_list;
     SFPreset *preset;
-    fluid_list_t *zone_list;
-    SFPresetZone *zone;
-    SFMod *mod;
-    int i;
+    int count = 0;
 
     /* traverse through all presets */
     preset_list = sf->preset;
@@ -952,36 +954,16 @@ static int load_pmod(SFData *sf, int size)
     {
         preset = (SFPreset *)fluid_list_get(preset_list);
 
-        /* traverse this preset's zones */
-        zone_list = preset->zone;
-        while (zone_list)
+        if (!load_preset_pmod(sf, preset, &count))
         {
-            zone = (SFPresetZone *)fluid_list_get(zone_list);
+            FLUID_LOG(FLUID_ERR, "Error loading preset modulators");
+            return FALSE;
+        }
 
-            /* load zone's modulators */
-            for (i = 0; i < zone->mod_count; i++)
-            {
-                mod = FLUID_NEW(SFMod);
-                if (mod == NULL)
-                {
-                    FLUID_LOG(FLUID_ERR, "Out of memory");
-                    return FALSE;
-                }
-                zone->mod = fluid_list_append(zone->mod, mod);
-
-                if ((size -= SF_MOD_SIZE) < 0)
-                {
-                    FLUID_LOG(FLUID_ERR, "Invalid PMOD size");
-                    return FALSE;
-                }
-                READW(sf, mod->src);
-                READW(sf, mod->dest);
-                READW(sf, mod->amount);
-                READW(sf, mod->amtsrc);
-                READW(sf, mod->trans);
-            }
-
-            zone_list = fluid_list_next(zone_list);
+        if ((size -= count * SF_MOD_SIZE) < 0)
+        {
+            FLUID_LOG(FLUID_ERR, "Preset mod size mismatch");
+            return FALSE;
         }
 
         preset_list = fluid_list_next(preset_list);
@@ -1002,6 +984,46 @@ static int load_pmod(SFData *sf, int size)
     return TRUE;
 }
 
+static int load_preset_pmod(SFData *sf, SFPreset *preset, int *count)
+{
+    fluid_list_t *zone_list;
+    SFPresetZone *zone;
+    SFMod *mod;
+    int i;
+    int read_count = 0;
+
+    /* traverse this preset's zones */
+    zone_list = preset->zone;
+    while (zone_list)
+    {
+        zone = (SFPresetZone *)fluid_list_get(zone_list);
+
+        /* load zone's modulators */
+        for (i = 0; i < zone->mod_count; i++, read_count++)
+        {
+            mod = FLUID_NEW(SFMod);
+            if (mod == NULL)
+            {
+                FLUID_LOG(FLUID_ERR, "Out of memory");
+                return FALSE;
+            }
+            zone->mod = fluid_list_append(zone->mod, mod);
+
+            READW(sf, mod->src);
+            READW(sf, mod->dest);
+            READW(sf, mod->amount);
+            READW(sf, mod->amtsrc);
+            READW(sf, mod->trans);
+        }
+
+        zone_list = fluid_list_next(zone_list);
+    }
+
+    *count = read_count;
+    return TRUE;
+}
+
+
 /* -------------------------------------------------------------------
  * preset generator loader
  * generator (per preset) loading rules:
@@ -1018,14 +1040,7 @@ static int load_pgen(SFData *sf, int size)
 {
     fluid_list_t *preset_list;
     SFPreset *preset;
-    fluid_list_t *zone_list;
-    SFPresetZone *zone;
-
-    SFGen *gen;
-    SFGenAmount genval;
-    unsigned short genid;
-
-    int level, i;
+    int count = 0;
 
     /* traverse through all presets */
     preset_list = sf->preset;
@@ -1033,69 +1048,16 @@ static int load_pgen(SFData *sf, int size)
     {
         preset = (SFPreset *)fluid_list_get(preset_list);
 
-        /* traverse all zones of this preset */
-        zone_list = preset->zone;
-        while(zone_list)
+        if (!load_preset_pgen(sf, preset, &count))
         {
-            zone = (SFPresetZone *)fluid_list_get(zone_list);
-            level = 0;
+            FLUID_LOG(FLUID_ERR, "Error loading preset generators");
+            return FALSE;
+        }
 
-            /* load all generators for this zone */
-            for (i = 0; i < zone->gen_count; i++)
-            {
-                gen = NULL;
-
-                if ((size -= SF_GEN_SIZE) < 0)
-                {
-                    FLUID_LOG(FLUID_ERR, "Preset gen chunk size mismatch");
-                    return FALSE;
-                }
-
-                READW(sf, genid);
-
-                if ((level == 0 && genid == Gen_KeyRange) ||
-                    (level <= 1 && genid == Gen_VelRange))
-                {
-                    level++;
-                    READB(sf, genval.range.lo);
-                    READB(sf, genval.range.hi);
-                }
-                else if (level < 3 && genid == Gen_Instrument)
-                {
-                    level = 3;
-                    READW(sf, genval.uword);
-                }
-                else if (level <= 2 && valid_preset_genid(genid))
-                {
-                    level = 2;
-                    READW(sf, genval.sword);
-                    gen = fluid_list_get(find_gen_by_id(genid, zone->gen));
-                }
-                else {
-                    FSKIPW(sf);
-                    FLUID_LOG(FLUID_WARN, "Ignoring generator");
-                    continue;
-                }
-
-                if (gen == NULL)
-                {
-                    gen = FLUID_NEW(SFGen);
-                    if (gen == NULL)
-                    {
-                        FLUID_LOG(FLUID_ERR, "Out of memory");
-                        return FALSE;
-                    }
-                    zone->gen = fluid_list_append(zone->gen, gen);
-                }
-
-                gen->id = genid;
-                gen->amount = genval;
-            }
-
-            /* move global zone to front */
-            /* discard duplicate global zones */
-
-            zone_list = fluid_list_next(zone_list);
+        if ((size -= count * SF_GEN_SIZE) < 0)
+        {
+            FLUID_LOG(FLUID_ERR, "Preset gen size mismatch");
+            return FALSE;
         }
 
         preset_list = fluid_list_next(preset_list);
@@ -1113,6 +1075,78 @@ static int load_pgen(SFData *sf, int size)
         return FALSE;
     }
 
+    return TRUE;
+}
+
+static int load_preset_pgen(SFData *sf, SFPreset *preset, int *count)
+{
+    fluid_list_t *zone_list;
+    SFPresetZone *zone;
+
+    SFGen *gen;
+    SFGenAmount genval;
+    unsigned short genid;
+    int i;
+    int level;
+    int read_count = 0;
+
+    /* traverse all zones of this preset */
+    zone_list = preset->zone;
+    while(zone_list)
+    {
+        zone = (SFPresetZone *)fluid_list_get(zone_list);
+        level = 0;
+
+        /* load all generators for this zone */
+        for (i = 0; i < zone->gen_count; i++, read_count++)
+        {
+            gen = NULL;
+
+            READW(sf, genid);
+
+            if ((level == 0 && genid == Gen_KeyRange) ||
+                (level <= 1 && genid == Gen_VelRange))
+            {
+                level++;
+                READB(sf, genval.range.lo);
+                READB(sf, genval.range.hi);
+            }
+            else if (level < 3 && genid == Gen_Instrument)
+            {
+                level = 3;
+                READW(sf, genval.uword);
+            }
+            else if (level <= 2 && valid_preset_genid(genid))
+            {
+                level = 2;
+                READW(sf, genval.sword);
+                gen = fluid_list_get(find_gen_by_id(genid, zone->gen));
+            }
+            else {
+                FSKIPW(sf);
+                FLUID_LOG(FLUID_WARN, "Ignoring generator");
+                continue;
+            }
+
+            if (gen == NULL)
+            {
+                gen = FLUID_NEW(SFGen);
+                if (gen == NULL)
+                {
+                    FLUID_LOG(FLUID_ERR, "Out of memory");
+                    return FALSE;
+                }
+                zone->gen = fluid_list_append(zone->gen, gen);
+            }
+
+            gen->id = genid;
+            gen->amount = genval;
+        }
+
+        zone_list = fluid_list_next(zone_list);
+    }
+
+    *count = read_count;
     return TRUE;
 }
 
@@ -1344,12 +1378,6 @@ static int load_igen(SFData *sf, int size)
     fluid_list_t *zone_list;
     SFInstZone *zone;
 
-    SFGen *gen;
-    SFGenAmount genval;
-    unsigned short genid;
-
-    int level, i;
-
     /* traverse through all instruments */
     inst_list = sf->inst;
     while (inst_list)
@@ -1361,62 +1389,18 @@ static int load_igen(SFData *sf, int size)
         while(zone_list)
         {
             zone = (SFInstZone *)fluid_list_get(zone_list);
-            level = 0;
 
-            /* load zone's generators */
-            for (i = 0; i < zone->gen_count; i++)
+            if ((size -= (SF_GEN_SIZE * zone->gen_count)) < 0)
             {
-                gen = NULL;
-
-                if ((size -= SF_GEN_SIZE) < 0)
-                {
-                    FLUID_LOG(FLUID_ERR, "Instrument gen chunk size mismatch");
-                    return FALSE;
-                }
-
-                READW(sf, genid);
-
-                if ((level == 0 && genid == Gen_KeyRange) ||
-                    (level <= 1 && genid == Gen_VelRange))
-                {
-                    level++;
-                    READB(sf, genval.range.lo);
-                    READB(sf, genval.range.hi);
-                }
-                else if (level < 3 && genid == Gen_SampleId)
-                {
-                    level = 3;
-                    READW(sf, genval.uword);
-                }
-                else if (level <= 2 && valid_inst_genid(genid))
-                {
-                    level = 2;
-                    READW(sf, genval.sword);
-                    gen = fluid_list_get(find_gen_by_id(genid, zone->gen));
-                }
-                else {
-                    FSKIPW(sf);
-                    FLUID_LOG(FLUID_WARN, "Ignoring generator");
-                    continue;
-                }
-
-                if (!gen) /* if we have not found a duplicate generator in this zone */
-                {
-                    gen = FLUID_NEW(SFGen);
-                    if (gen == NULL)
-                    {
-                        FLUID_LOG(FLUID_ERR, "Out of memory");
-                        return FALSE;
-                    }
-                    zone->gen = fluid_list_append(zone->gen, gen);
-                }
-
-                gen->id = genid;
-                gen->amount = genval;
+                FLUID_LOG(FLUID_ERR, "Instrument gen chunk size mismatch");
+                return FALSE;
             }
 
-            /* move global zone to front */
-            /* discard duplicate global zones */
+            if (!load_inst_zone_gens(sf, zone))
+            {
+                FLUID_LOG(FLUID_ERR, "Unable to load instrument generators");
+                return FALSE;
+            }
 
             zone_list = fluid_list_next(zone_list);
         }
@@ -1427,7 +1411,7 @@ static int load_igen(SFData *sf, int size)
     /* It seems not all soundfonts include a terminal record here... */
     if (size == SF_GEN_SIZE)
     {
-        /* Skip over terminating pbag */
+        /* Skip over terminating record */
         sf->fcbs->fseek(sf->sffd, SF_GEN_SIZE, SEEK_CUR);
     }
     else if (size != 0)
@@ -1438,6 +1422,65 @@ static int load_igen(SFData *sf, int size)
 
     return TRUE;
 }
+
+
+static int load_inst_zone_gens(SFData *sf, SFInstZone *zone)
+{
+    SFGen *gen;
+    SFGenAmount genval;
+    unsigned short genid;
+    int i;
+    int level = 0;
+
+    /* load zone's generators */
+    for (i = 0; i < zone->gen_count; i++)
+    {
+        gen = NULL;
+
+        READW(sf, genid);
+
+        if ((level == 0 && genid == Gen_KeyRange) ||
+            (level <= 1 && genid == Gen_VelRange))
+        {
+            level++;
+            READB(sf, genval.range.lo);
+            READB(sf, genval.range.hi);
+        }
+        else if (level < 3 && genid == Gen_SampleId)
+        {
+            level = 3;
+            READW(sf, genval.uword);
+        }
+        else if (level <= 2 && valid_inst_genid(genid))
+        {
+            level = 2;
+            READW(sf, genval.sword);
+            gen = fluid_list_get(find_gen_by_id(genid, zone->gen));
+        }
+        else {
+            FSKIPW(sf);
+            FLUID_LOG(FLUID_WARN, "Ignoring generator");
+            continue;
+        }
+
+        if (!gen) /* if we have not found a duplicate generator in this zone */
+        {
+            gen = FLUID_NEW(SFGen);
+            if (gen == NULL)
+            {
+                FLUID_LOG(FLUID_ERR, "Out of memory");
+                return FALSE;
+            }
+            zone->gen = fluid_list_append(zone->gen, gen);
+        }
+
+        gen->id = genid;
+        gen->amount = genval;
+    }
+
+    return TRUE;
+}
+
 
 static int fixup_preset_zones(SFData *sf)
 {
