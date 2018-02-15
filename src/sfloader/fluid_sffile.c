@@ -287,7 +287,7 @@ static void delete_inst_zone(SFInstZone *zone);
  * @param fcbs file callback structure
  * @return the parsed SoundFont as SFData structure or NULL on error
  */
-SFData *fluid_sf2_load(const char *fname, const fluid_file_callbacks_t *fcbs)
+SFData *fluid_sffile_load(const char *fname, const fluid_file_callbacks_t *fcbs)
 {
     SFData *sf;
     int fsize = 0;
@@ -340,7 +340,7 @@ SFData *fluid_sf2_load(const char *fname, const fluid_file_callbacks_t *fcbs)
     return sf;
 
 error_exit:
-    fluid_sf2_close(sf);
+    fluid_sffile_close(sf);
     return NULL;
 }
 
@@ -350,7 +350,7 @@ error_exit:
  * @param sf pointer to SFData structure
  * @param fcbs file callback structure
  */
-void fluid_sf2_close(SFData *sf)
+void fluid_sffile_close(SFData *sf)
 {
     fluid_list_t *entry;
     SFPreset *preset;
@@ -588,7 +588,7 @@ static int process_info(SFData *sf, int size)
                 return FALSE;
             }
 
-            /* attach to INFO list, fluid_sf2_close will cleanup if FAIL occurs */
+            /* attach to INFO list, fluid_sffile_close will cleanup if FAIL occurs */
             sf->info = fluid_list_append(sf->info, item);
 
             *(unsigned char *)item = id;
@@ -632,9 +632,7 @@ static int process_sdta(SFData *sf, unsigned int size)
         return FALSE;
     }
 
-    /* SDTA chunk may also contain sm24 chunk for 24 bit samples
-     * (not yet supported), only an error if SMPL chunk size is
-     * greater than SDTA. */
+    /* SDTA chunk may also contain sm24 chunk for 24 bit samples */
     if (chunk.size > size)
     {
         FLUID_LOG(FLUID_ERR, _("SDTA chunk size mismatch"));
@@ -1465,7 +1463,7 @@ static int fixup_preset_zones(SFData *sf)
             zone = (SFPresetZone *)fluid_list_get(zone_list);
             /* Advance zone_list pointer here already, as we might remove the
              * current zone from the list and wouldn't be able to get the next
-             * element after that. */
+             * element after removing the curent one. */
             zone_list = fluid_list_next(zone_list);
 
             gen = fluid_list_get(fluid_list_last(zone->gen));
@@ -1473,7 +1471,6 @@ static int fixup_preset_zones(SFData *sf)
             /* Zones without modulators or generators should be ignored */
             if (gen == NULL && zone->mod == NULL)
             {
-                FLUID_LOG(FLUID_WARN, "Discarding empty preset zone");
                 preset->zone = fluid_list_remove(preset->zone, zone);
                 delete_preset_zone(zone);
             }
@@ -1549,7 +1546,6 @@ static int fixup_inst_zones(SFData *sf)
             /* Zones without modulators or generators should be ignored */
             if (gen == NULL && zone->mod == NULL)
             {
-                FLUID_LOG(FLUID_WARN, "Discarding empty instrument zone");
                 inst->zone = fluid_list_remove(inst->zone, zone);
                 delete_inst_zone(zone);
             }
