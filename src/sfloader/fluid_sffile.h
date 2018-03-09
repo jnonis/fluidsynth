@@ -113,6 +113,8 @@ struct _SFInstZone
 
 struct _SFSample
 { /* Sample structure */
+    unsigned short idx;
+
     char name[21]; /* Name of sample */
     unsigned char samfile; /* Loaded sfont/sample buffer = 0/1 */
     unsigned int start; /* Offset in sample area to start of sample */
@@ -135,6 +137,8 @@ struct _SFSample
 
 struct _SFInst
 { /* Instrument structure */
+    unsigned short idx;
+
     char name[21]; /* Name of instrument */
 
     unsigned int ibag_idx;
@@ -170,6 +174,32 @@ struct _SFData
     unsigned int sample24pos; /* position within sffd of the sm24 chunk, set to zero if no 24 bit
                                  sample support */
     unsigned int sample24size; /* length within sffd of the sm24 chunk */
+
+    /* Position of SDTA subchunks */
+    unsigned int smpl_pos;
+    unsigned int smpl_size;
+    unsigned int smpl24_pos;
+    unsigned int smpl24_size;
+
+    /* Position and number of records of PDTA (HYDRA) subchunks */
+    int phdr_pos;
+    int phdr_count;
+    int pbag_pos;
+    int pbag_count;
+    int pmod_pos;
+    int pmod_count;
+    int pgen_pos;
+    int pgen_count;
+    int ihdr_pos;
+    int ihdr_count;
+    int ibag_pos;
+    int ibag_count;
+    int imod_pos;
+    int imod_count;
+    int igen_pos;
+    int igen_count;
+    int shdr_pos;
+    int shdr_count;
 
     char *fname; /* file name */
     FILE *sffd; /* loaded sfont file descriptor */
