@@ -276,7 +276,6 @@ static unsigned int chunkid(unsigned int id);
 static int read_listchunk(SFData *sf, SFChunk *chunk);
 static int pdtahelper(SFData *sf, unsigned int chunk_id, unsigned int record_size, int min_record_count,
         int *chunk_pos, int *record_count, int *available_size);
-static int preset_compare_func(void *a, void *b);
 static fluid_list_t *find_gen_by_id(int genid, fluid_list_t *genlist);
 static int valid_inst_genid(unsigned short genid);
 static int valid_preset_genid(unsigned short genid);
@@ -1773,17 +1772,6 @@ static void delete_inst_zone(SFInstZone *zone)
     delete_fluid_list(zone->mod);
 
     FLUID_FREE(zone);
-}
-
-/* preset sort function, first by bank, then by preset # */
-static int preset_compare_func(void *a, void *b)
-{
-    int aval, bval;
-
-    aval = (int)(((SFPreset *)a)->bank) << 16 | ((SFPreset *)a)->prenum;
-    bval = (int)(((SFPreset *)b)->bank) << 16 | ((SFPreset *)b)->prenum;
-
-    return (aval - bval);
 }
 
 /* Find a generator by its id in the passed in list.
