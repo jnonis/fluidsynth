@@ -779,7 +779,7 @@ static int pdtahelper(SFData *sf, unsigned int chunk_id, unsigned int record_siz
     if (*chunk_pos == FLUID_FAILED)
     {
         FLUID_LOG(FLUID_ERR, "Unable to read file position");
-        return FALSE;                                              \
+        return FALSE;
     }
 
     FSKIP(sf, chunk.size);
