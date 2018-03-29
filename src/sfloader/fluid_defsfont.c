@@ -169,6 +169,24 @@ int fluid_defsfont_sfont_iteration_next(fluid_sfont_t* sfont, fluid_preset_t* pr
   return fluid_defsfont_iteration_next(fluid_sfont_get_data(sfont), preset);
 }
 
+fluid_sample_t *fluid_defsfont_sample_by_idx(fluid_defsfont_t *sfont, unsigned short idx)
+{
+    fluid_sample_t *sample;
+    fluid_list_t *sample_list = sfont->sample;
+
+    while (sample_list)
+    {
+        sample = (fluid_sample_t *)fluid_list_get(sample_list);
+        if (sample->idx == idx)
+        {
+            return sample;
+        }
+        sample_list = fluid_list_next(sample_list);
+    }
+
+    return NULL;
+}
+
 void fluid_defpreset_preset_delete(fluid_preset_t* preset)
 {
   fluid_defpreset_t* defpreset = fluid_preset_get_data(preset);
@@ -623,9 +641,6 @@ int fluid_defsfont_load(fluid_defsfont_t* sfont, const fluid_file_callbacks_t* f
 
     if (fluid_sample_import_sfont(sample, sfsample, sfont) != FLUID_OK)
       goto err_exit;
-
-    /* Store reference to FluidSynth sample in SFSample for later IZone fixups */
-    sfsample->fluid_sample = sample;
 
     fluid_defsfont_add_sample(sfont, sample);
     fluid_voice_optimize_sample(sample);
@@ -1660,7 +1675,7 @@ fluid_inst_zone_import_sfont(fluid_preset_zone_t* preset_zone, fluid_inst_zone_t
 
   /* fixup sample pointer */
   if (sfzone->sample != NULL)
-    zone->sample = sfzone->sample->fluid_sample;
+      zone->sample = fluid_defsfont_sample_by_idx(sfont, sfzone->sample->idx);
 
   /* Import the modulators (only SF2.1 and higher) */
   for (count = 0, r = sfzone->mod; r != NULL; count++) {
@@ -1838,6 +1853,7 @@ int
 fluid_sample_import_sfont(fluid_sample_t* sample, SFSample* sfsample, fluid_defsfont_t* sfont)
 {
   FLUID_STRCPY(sample->name, sfsample->name);
+  sample->idx = sfsample->idx;
   sample->data = sfont->sampledata;
   sample->data24 = sfont->sample24data;
   sample->start = sfsample->start;

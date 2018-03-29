@@ -132,7 +132,6 @@ struct _SFSample
     unsigned char origpitch; /* root midi key number */
     signed char pitchadj; /* pitch correction in cents */
     unsigned short sampletype; /* 1 mono,2 right,4 left,linked 8,0x8000=ROM */
-    fluid_sample_t *fluid_sample; /* Imported sample (fixed up in fluid_defsfont_load) */
 };
 
 struct _SFInst

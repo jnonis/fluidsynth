@@ -80,6 +80,8 @@ fluid_preset_t* fluid_defsfont_sfont_get_preset(fluid_sfont_t* sfont, unsigned i
 void fluid_defsfont_sfont_iteration_start(fluid_sfont_t* sfont);
 int fluid_defsfont_sfont_iteration_next(fluid_sfont_t* sfont, fluid_preset_t* preset);
 
+fluid_sample_t *fluid_defsfont_sample_by_idx(fluid_defsfont_t *sfont, unsigned short idx);
+
 
 void fluid_defpreset_preset_delete(fluid_preset_t* preset);
 const char* fluid_defpreset_preset_get_name(fluid_preset_t* preset);

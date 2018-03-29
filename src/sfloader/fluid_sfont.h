@@ -174,6 +174,7 @@ struct _fluid_preset_t {
  */
 struct _fluid_sample_t
 {
+  unsigned short idx;
   char name[21];                /**< Sample name */
   unsigned int start;           /**< Start index */
   unsigned int end;	        /**< End index, index of last valid sample point (contrary to SF spec) */
